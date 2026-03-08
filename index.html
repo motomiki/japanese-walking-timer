@@ -56,6 +56,7 @@
             <div class="absolute flex flex-col items-center justify-center mt-2">
                 <span id="time-text" class="text-6xl font-black tabular-nums tracking-tighter text-gray-800">03:00</span>
                 <span id="phase-label" class="text-sm font-bold text-gray-400 mt-2">3分速歩から開始</span>
+                <span id="treadmill-hint" class="text-xs text-gray-400 mt-1 max-w-[12rem] text-center hidden"></span>
             </div>
         </div>
 
@@ -105,6 +106,7 @@
             setText: document.getElementById('set-text'),
             timeText: document.getElementById('time-text'),
             phaseLabel: document.getElementById('phase-label'),
+            treadmillHint: document.getElementById('treadmill-hint'),
             progressCircle: document.getElementById('progress-circle'),
             playPauseBtn: document.getElementById('play-pause-btn'),
             resetBtn: document.getElementById('reset-btn'),
@@ -266,6 +268,8 @@
                     els.statusText.className = 'text-xl font-black text-gray-400 smooth-transition';
                     els.statusText.textContent = '準備完了';
                     els.phaseLabel.textContent = '3分速歩から開始';
+                    els.treadmillHint.textContent = '';
+                    els.treadmillHint.classList.add('hidden');
                     els.progressCircle.classList.add('text-gray-300');
                     els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-blue-500 text-white flex justify-center items-center shadow-lg shadow-blue-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition';
                     break;
@@ -274,6 +278,9 @@
                     els.statusText.className = 'text-2xl font-black text-red-500 smooth-transition';
                     els.statusText.textContent = '速歩！';
                     els.phaseLabel.textContent = '目標: VO₂peak 70%以上';
+                    els.treadmillHint.textContent = 'トレッドミルは時速7kmに設定';
+                    els.treadmillHint.classList.remove('hidden');
+                    els.treadmillHint.className = 'text-xs text-red-400/90 mt-1 max-w-[12rem] text-center';
                     els.progressCircle.classList.add('text-red-500');
                     els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-red-500 text-white flex justify-center items-center shadow-lg shadow-red-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition';
                     break;
@@ -282,6 +289,9 @@
                     els.statusText.className = 'text-2xl font-black text-blue-500 smooth-transition';
                     els.statusText.textContent = 'ゆっくり歩行';
                     els.phaseLabel.textContent = '目標: VO₂peak 40%程度';
+                    els.treadmillHint.textContent = 'トレッドミルは時速3kmに設定';
+                    els.treadmillHint.classList.remove('hidden');
+                    els.treadmillHint.className = 'text-xs text-blue-400/90 mt-1 max-w-[12rem] text-center';
                     els.progressCircle.classList.add('text-blue-500');
                     els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-blue-500 text-white flex justify-center items-center shadow-lg shadow-blue-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition';
                     break;
@@ -290,6 +300,8 @@
                     els.statusText.className = 'text-2xl font-black text-green-500 smooth-transition';
                     els.statusText.textContent = '完了！';
                     els.phaseLabel.textContent = '30分の運動お疲れ様でした';
+                    els.treadmillHint.textContent = '';
+                    els.treadmillHint.classList.add('hidden');
                     els.progressCircle.classList.add('text-green-500');
                     els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-gray-300 text-white flex justify-center items-center shadow smooth-transition cursor-not-allowed';
                     break;
