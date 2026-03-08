@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Japanese Walking Timer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        /* カスタムの滑らかなアニメーション設定 */
+        .smooth-transition {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .progress-transition {
+            transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+        }
+        /* マテリアルデザインのリップル風エフェクト */
+        .btn-active:active {
+            transform: scale(0.92);
+        }
+    </style>
+</head>
+<body id="app-body" class="bg-gray-100 min-h-screen flex items-center justify-center font-sans smooth-transition text-gray-800">
+
+    <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-[24rem] mx-4 relative overflow-hidden flex flex-col items-center">
+        
+        <!-- ヘッダー -->
+        <div class="text-center mb-6 w-full">
+            <h1 class="text-2xl font-bold tracking-tight text-gray-800">Japanese Walking</h1>
+            <p class="text-sm text-gray-500 font-medium mt-1">インターバル速歩タイマー</p>
+        </div>
+
+        <!-- ステータスとセット数 -->
+        <div class="flex justify-between items-center w-full px-2 mb-6">
+            <div id="status-text" class="text-xl font-black text-gray-400 smooth-transition">
+                準備完了
+            </div>
+            <div class="text-base font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                Set <span id="set-text" class="text-gray-800 text-lg ml-1">1</span> / 5
+            </div>
+        </div>
+
+        <!-- タイマーリング -->
+        <div class="relative flex justify-center items-center mb-10">
+            <svg class="w-64 h-64 transform -rotate-90 drop-shadow-sm">
+                <!-- 背景の円 -->
+                <circle cx="128" cy="128" r="116" stroke="currentColor" stroke-width="12" fill="transparent" class="text-gray-100" />
+                <!-- プログレスバー（進捗円） -->
+                <circle id="progress-circle" cx="128" cy="128" r="116" stroke="currentColor" stroke-width="12" fill="transparent" 
+                        stroke-dasharray="728.85" stroke-dashoffset="0" stroke-linecap="round"
+                        class="text-gray-300 progress-transition" />
+            </svg>
+            <!-- 中央のテキスト -->
+            <div class="absolute flex flex-col items-center justify-center mt-2">
+                <span id="time-text" class="text-6xl font-black tabular-nums tracking-tighter text-gray-800">03:00</span>
+                <span id="phase-label" class="text-sm font-bold text-gray-400 mt-2">3分速歩から開始</span>
+            </div>
+        </div>
+
+        <!-- コントロールボタン -->
+        <div class="flex justify-center items-center space-x-6 w-full px-4">
+            <!-- リセットボタン -->
+            <button id="reset-btn" class="w-14 h-14 rounded-full bg-gray-50 text-gray-500 flex justify-center items-center shadow-sm border border-gray-100 hover:bg-gray-100 btn-active smooth-transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+            
+            <!-- 再生/一時停止ボタン -->
+            <button id="play-pause-btn" class="w-20 h-20 rounded-full bg-blue-500 text-white flex justify-center items-center shadow-lg shadow-blue-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition">
+                <!-- Play Icon -->
+                <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+                <!-- Pause Icon -->
+                <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 hidden" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定値 ---
+        const PHASE_SECONDS = 3 * 60; // 1フェーズの時間（3分 = 180秒）
+        const TOTAL_SETS = 5;         // 合計セット数
+        const CIRCUMFERENCE = 2 * Math.PI * 116; // SVG円の周囲長
+
+        // --- 状態管理 ---
+        let currentPhaseTime = PHASE_SECONDS;
+        let currentPhase = 'idle'; // 'idle', 'fast', 'slow', 'finished'
+        let currentSet = 1;
+        let isRunning = false;
+        let timerInterval = null;
+        let expectedEndTime = 0;
+        let lastBeepSec = -1;
+        let isToneInitialized = false;
+
+        // --- DOM要素 ---
+        const els = {
+            body: document.getElementById('app-body'),
+            statusText: document.getElementById('status-text'),
+            setText: document.getElementById('set-text'),
+            timeText: document.getElementById('time-text'),
+            phaseLabel: document.getElementById('phase-label'),
+            progressCircle: document.getElementById('progress-circle'),
+            playPauseBtn: document.getElementById('play-pause-btn'),
+            resetBtn: document.getElementById('reset-btn'),
+            playIcon: document.getElementById('play-icon'),
+            pauseIcon: document.getElementById('pause-icon')
+        };
+
+        // --- Tone.js 音声設定 ---
+        // カウントダウン用のシンプルな音
+        const beepSynth = new Tone.Synth({
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+        }).toDestination();
+
+        // フェーズ切り替え用の和音
+        const chordSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.05, decay: 0.2, sustain: 0.2, release: 1.5 }
+        }).toDestination();
+
+        function playCountdownBeep() {
+            beepSynth.triggerAttackRelease("C6", "16n");
+        }
+
+        function playPhaseChange(phase) {
+            if (phase === 'fast') {
+                // 速歩：元気で高めの和音
+                chordSynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "2n");
+            } else if (phase === 'slow') {
+                // ゆっくり：落ち着いた和音
+                chordSynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n");
+            }
+        }
+
+        function playFinishSound() {
+            // 完了時：ファンファーレ風の和音
+            chordSynth.triggerAttackRelease(["C4", "E4", "G4", "B4", "D5", "G5"], "1n");
+        }
+
+        // --- タイマーロジック ---
+        function tick() {
+            const now = Date.now();
+            let remaining = Math.ceil((expectedEndTime - now) / 1000);
+            if (remaining < 0) remaining = 0;
+
+            if (remaining !== currentPhaseTime) {
+                currentPhaseTime = remaining;
+                
+                // 残り3秒でカウントダウン音
+                if (currentPhaseTime <= 3 && currentPhaseTime > 0 && lastBeepSec !== currentPhaseTime) {
+                    playCountdownBeep();
+                    lastBeepSec = currentPhaseTime;
+                }
+
+                updateUI();
+
+                // フェーズ終了
+                if (currentPhaseTime === 0) {
+                    handlePhaseEnd();
+                }
+            }
+        }
+
+        function handlePhaseEnd() {
+            clearInterval(timerInterval);
+            lastBeepSec = -1;
+
+            if (currentPhase === 'fast') {
+                // 速歩 -> ゆっくり歩行へ
+                currentPhase = 'slow';
+                currentPhaseTime = PHASE_SECONDS;
+                playPhaseChange('slow');
+                startTimerInterval();
+            } else if (currentPhase === 'slow') {
+                // ゆっくり歩行完了
+                if (currentSet >= TOTAL_SETS) {
+                    // 全セット完了
+                    currentPhase = 'finished';
+                    isRunning = false;
+                    playFinishSound();
+                    updateUI();
+                } else {
+                    // 次のセットの速歩へ
+                    currentSet++;
+                    currentPhase = 'fast';
+                    currentPhaseTime = PHASE_SECONDS;
+                    playPhaseChange('fast');
+                    startTimerInterval();
+                }
+            }
+        }
+
+        function startTimerInterval() {
+            expectedEndTime = Date.now() + currentPhaseTime * 1000;
+            timerInterval = setInterval(tick, 100);
+        }
+
+        function togglePlayPause() {
+            if (currentPhase === 'finished') return;
+
+            if (isRunning) {
+                // 一時停止
+                clearInterval(timerInterval);
+                isRunning = false;
+                updateUI();
+            } else {
+                // 再生
+                if (currentPhase === 'idle') {
+                    currentPhase = 'fast';
+                    currentPhaseTime = PHASE_SECONDS;
+                    playPhaseChange('fast');
+                }
+                isRunning = true;
+                startTimerInterval();
+                updateUI();
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            currentPhase = 'idle';
+            currentSet = 1;
+            currentPhaseTime = PHASE_SECONDS;
+            lastBeepSec = -1;
+            updateUI();
+        }
+
+        // --- UI更新ロジック ---
+        function updateUI() {
+            // 1. 時間のテキスト更新
+            const m = Math.floor(currentPhaseTime / 60).toString().padStart(2, '0');
+            const s = (currentPhaseTime % 60).toString().padStart(2, '0');
+            els.timeText.textContent = `${m}:${s}`;
+
+            // 2. プログレスバーの更新
+            const progress = currentPhaseTime / PHASE_SECONDS;
+            const offset = CIRCUMFERENCE - (progress * CIRCUMFERENCE);
+            els.progressCircle.style.strokeDashoffset = offset;
+
+            // 3. セット数の更新
+            els.setText.textContent = currentSet;
+
+            // 4. ボタンアイコンの切り替え
+            if (isRunning) {
+                els.playIcon.classList.add('hidden');
+                els.pauseIcon.classList.remove('hidden');
+            } else {
+                els.playIcon.classList.remove('hidden');
+                els.pauseIcon.classList.add('hidden');
+            }
+
+            // 5. 状態に応じたテーマカラーとテキストの適用
+            els.progressCircle.setAttribute('class', 'progress-transition ');
+            
+            switch (currentPhase) {
+                case 'idle':
+                    els.body.className = 'bg-gray-100 min-h-screen flex items-center justify-center font-sans smooth-transition text-gray-800';
+                    els.statusText.className = 'text-xl font-black text-gray-400 smooth-transition';
+                    els.statusText.textContent = '準備完了';
+                    els.phaseLabel.textContent = '3分速歩から開始';
+                    els.progressCircle.classList.add('text-gray-300');
+                    els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-blue-500 text-white flex justify-center items-center shadow-lg shadow-blue-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition';
+                    break;
+                case 'fast':
+                    els.body.className = 'bg-red-50 min-h-screen flex items-center justify-center font-sans smooth-transition text-gray-800';
+                    els.statusText.className = 'text-2xl font-black text-red-500 smooth-transition';
+                    els.statusText.textContent = '速歩！';
+                    els.phaseLabel.textContent = '目標: VO₂peak 70%以上';
+                    els.progressCircle.classList.add('text-red-500');
+                    els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-red-500 text-white flex justify-center items-center shadow-lg shadow-red-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition';
+                    break;
+                case 'slow':
+                    els.body.className = 'bg-blue-50 min-h-screen flex items-center justify-center font-sans smooth-transition text-gray-800';
+                    els.statusText.className = 'text-2xl font-black text-blue-500 smooth-transition';
+                    els.statusText.textContent = 'ゆっくり歩行';
+                    els.phaseLabel.textContent = '目標: VO₂peak 40%程度';
+                    els.progressCircle.classList.add('text-blue-500');
+                    els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-blue-500 text-white flex justify-center items-center shadow-lg shadow-blue-500/40 hover:scale-105 hover:shadow-xl btn-active smooth-transition';
+                    break;
+                case 'finished':
+                    els.body.className = 'bg-green-50 min-h-screen flex items-center justify-center font-sans smooth-transition text-gray-800';
+                    els.statusText.className = 'text-2xl font-black text-green-500 smooth-transition';
+                    els.statusText.textContent = '完了！';
+                    els.phaseLabel.textContent = '30分の運動お疲れ様でした';
+                    els.progressCircle.classList.add('text-green-500');
+                    els.playPauseBtn.className = 'w-20 h-20 rounded-full bg-gray-300 text-white flex justify-center items-center shadow smooth-transition cursor-not-allowed';
+                    break;
+            }
+        }
+
+        // --- イベントリスナー ---
+        els.playPauseBtn.addEventListener('click', async () => {
+            // Tone.jsはユーザーアクションのコンテキスト内で起動する必要がある
+            if (!isToneInitialized) {
+                await Tone.start();
+                isToneInitialized = true;
+            }
+            togglePlayPause();
+        });
+
+        els.resetBtn.addEventListener('click', () => {
+            if (isToneInitialized) beepSynth.triggerAttackRelease("G5", "32n");
+            resetTimer();
+        });
+
+        // 初期描画
+        updateUI();
+    </script>
+</body>
+</html>
