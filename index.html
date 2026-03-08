@@ -37,8 +37,12 @@
             <div id="status-text" class="text-xl font-black text-gray-400 smooth-transition">
                 準備完了
             </div>
-            <div class="text-base font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                Set <span id="set-text" class="text-gray-800 text-lg ml-1">1</span> / 5
+            <div class="text-base font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100 flex items-center gap-2">
+                <span>Set <span id="set-text" class="text-gray-800 text-lg ml-1">1</span> / 5</span>
+                <span id="phase-dots" class="flex items-center gap-1" aria-label="セット内フェーズ">
+                    <span id="phase-dot-1" class="w-2 h-2 rounded-full transition-colors"></span>
+                    <span id="phase-dot-2" class="w-2 h-2 rounded-full transition-colors"></span>
+                </span>
             </div>
         </div>
 
@@ -104,6 +108,8 @@
             body: document.getElementById('app-body'),
             statusText: document.getElementById('status-text'),
             setText: document.getElementById('set-text'),
+            phaseDot1: document.getElementById('phase-dot-1'),
+            phaseDot2: document.getElementById('phase-dot-2'),
             timeText: document.getElementById('time-text'),
             phaseLabel: document.getElementById('phase-label'),
             treadmillHint: document.getElementById('treadmill-hint'),
@@ -250,7 +256,21 @@
             // 3. セット数の更新
             els.setText.textContent = currentSet;
 
-            // 4. ボタンアイコンの切り替え
+            // 4. セット内フェーズの更新（●○ = 1/2 速歩、●● = 2/2 ゆっくり歩行）
+            const dotFilled = 'bg-gray-500';
+            const dotEmpty = 'bg-gray-200';
+            if (currentPhase === 'fast') {
+                els.phaseDot1.className = `w-2 h-2 rounded-full ${dotFilled} transition-colors`;
+                els.phaseDot2.className = `w-2 h-2 rounded-full ${dotEmpty} transition-colors`;
+            } else if (currentPhase === 'slow' || currentPhase === 'finished') {
+                els.phaseDot1.className = `w-2 h-2 rounded-full ${dotFilled} transition-colors`;
+                els.phaseDot2.className = `w-2 h-2 rounded-full ${dotFilled} transition-colors`;
+            } else {
+                els.phaseDot1.className = `w-2 h-2 rounded-full ${dotEmpty} transition-colors`;
+                els.phaseDot2.className = `w-2 h-2 rounded-full ${dotEmpty} transition-colors`;
+            }
+
+            // 5. ボタンアイコンの切り替え
             if (isRunning) {
                 els.playIcon.classList.add('hidden');
                 els.pauseIcon.classList.remove('hidden');
@@ -259,7 +279,7 @@
                 els.pauseIcon.classList.add('hidden');
             }
 
-            // 5. 状態に応じたテーマカラーとテキストの適用
+            // 6. 状態に応じたテーマカラーとテキストの適用
             els.progressCircle.setAttribute('class', 'progress-transition ');
             
             switch (currentPhase) {
